@@ -62,11 +62,12 @@ public class RlpDecoder {
      */
     public static RlpList decode(byte[] rlpEncoded) {
         RlpList rlpList = new RlpList(new ArrayList<>());
-        traverse(rlpEncoded, 0, rlpEncoded.length, rlpList);
+        traverse(rlpEncoded, 0, rlpEncoded.length, -1, rlpList);
         return rlpList;
     }
 
-    private static void traverse(byte[] data, int startPos, int endPos, RlpList rlpList) {
+    private static void traverse(
+            byte[] data, int startPos, int endPos, int outerPrefixLength, RlpList rlpList) {
 
         try {
             if (data == null || data.length == 0) {
@@ -87,6 +88,12 @@ public class RlpDecoder {
                     // 1. the data is a string if the range of the
                     // first byte(i.e. prefix) is [0x00, 0x7f],
                     // and the string is the first byte itself exactly;
+
+                    // Input validation
+                    if ((outerPrefixLength == 0 || outerPrefixLength > 1)
+                            || (outerPrefixLength == -1 && (endPos - (startPos + 1) > 0))) {
+                        throw new RuntimeException("RLP length mismatch");
+                    }
 
                     byte[] rlpData = {(byte) prefix};
                     rlpList.getValues().add(RlpString.create(rlpData));
@@ -149,9 +156,8 @@ public class RlpDecoder {
                     // total payload is equal to the first byte minus 0xc0 follows the first byte;
 
                     byte listLen = (byte) (prefix - OFFSET_SHORT_LIST);
-
                     RlpList newLevelList = new RlpList(new ArrayList<>());
-                    traverse(data, startPos + 1, startPos + listLen + 1, newLevelList);
+                    traverse(data, startPos + 1, startPos + listLen + 1, listLen, newLevelList);
                     rlpList.getValues().add(newLevelList);
 
                     startPos += 1 + listLen;
@@ -173,6 +179,7 @@ public class RlpDecoder {
                             data,
                             startPos + lenOfListLen + 1,
                             startPos + lenOfListLen + listLen + 1,
+                            listLen,
                             newLevelList);
                     rlpList.getValues().add(newLevelList);
 
@@ -185,6 +192,9 @@ public class RlpDecoder {
     }
 
     private static int calcLength(int lengthOfLength, byte[] data, int pos) {
+        if (pos + lengthOfLength > data.length - 1) {
+            throw new RuntimeException("RLP attempting to read outside array");
+        }
         byte pow = (byte) (lengthOfLength - 1);
         long length = 0;
         for (int i = 1; i <= lengthOfLength; ++i) {

@@ -332,5 +332,13 @@ public class RlpDecoderTest {
                                 new byte[] {
                                     (byte) 0xbb, (byte) 0x7f, (byte) 0xff, (byte) 0xff, (byte) 0xff
                                 })));
+
+        assertThrows(
+                RuntimeException.class,
+                (() ->
+                        RlpDecoder.decode(
+                                new byte[] {
+                                    (byte) 0x58, (byte) 0x58, (byte) 0x58, (byte) 0x58, (byte) 0x58
+                                })));
     }
 }
